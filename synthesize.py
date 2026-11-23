@@ -43,20 +43,20 @@ def ensure_f5_tts():
         print("f5-tts 安装完成")
 
 
-def infer_api(ref_audio, ref_text, gen_text, out_path, model):
+def infer_api(ref_audio, ref_text, gen_text, out_path, model, speed=1.0):
     from f5_tts.api import F5TTS
     import torch
     device = "cuda" if torch.cuda.is_available() else "cpu"
-    print("设备：%s，模型：%s" % (device, model))
+    print("设备：%s，模型：%s，语速：%s" % (device, model, speed))
     f5 = F5TTS(model=model, device=device)
     wav, sr, _spec = f5.infer(
         ref_file=ref_audio, ref_text=ref_text, gen_text=gen_text,
-        file_wave=out_path)
+        file_wave=out_path, speed=speed)
     print("API 推理完成：%s（%d Hz，%d 采样）" % (out_path, sr, len(wav)))
     return out_path
 
 
-def infer_cli(ref_audio, ref_text, gen_text, out_path, model):
+def infer_cli(ref_audio, ref_text, gen_text, out_path, model, speed=1.0):
     out_dir = os.path.dirname(os.path.abspath(out_path))
     out_name = os.path.basename(out_path)
     cmd = [sys.executable, "-m", "f5_tts.infer.infer_cli",
@@ -64,6 +64,7 @@ def infer_cli(ref_audio, ref_text, gen_text, out_path, model):
            "--ref_audio", ref_audio,
            "--ref_text", ref_text,
            "--gen_text", gen_text,
+           "--speed", str(speed),
            "--output_dir", out_dir]
     print("API 不可用，退 CLI：%s" % " ".join(cmd))
     r = subprocess.run(cmd, capture_output=True, text=True, timeout=1200)
@@ -92,6 +93,8 @@ def main():
     ap.add_argument("--gen-text", required=True, help="要合成的目标文本")
     ap.add_argument("--out", default="/content/xiaoran_trial.wav")
     ap.add_argument("--model", default="F5TTS_v1_Base")
+    ap.add_argument("--speed", type=float, default=1.0,
+                    help="语速：小于 1 变慢（如 0.8），大于 1 变快")
     args = ap.parse_args()
 
     workdir = os.path.dirname(os.path.abspath(args.out))
@@ -105,10 +108,12 @@ def main():
 
     ensure_f5_tts()
     try:
-        infer_api(ref_audio, ref_text, args.gen_text, args.out, args.model)
+        infer_api(ref_audio, ref_text, args.gen_text, args.out, args.model,
+                  speed=args.speed)
     except Exception as e:
         print("API 推理出错（%s），退 CLI" % e)
-        infer_cli(ref_audio, ref_text, args.gen_text, args.out, args.model)
+        infer_cli(ref_audio, ref_text, args.gen_text, args.out, args.model,
+                  speed=args.speed)
 
     import wave
     with wave.open(args.out, "rb") as w:
