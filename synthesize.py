@@ -92,38 +92,31 @@ def trim_silence(path, thresh=0.02):
     return (end - start) / sr
 
 
-def split_gen_chunks(text, max_len=30, min_len=15):
-    """按所有标点切成自然换气组（分句）；过短的并入上一块；过长的硬切。
+def split_gen_chunks(text, max_len=40, min_len=15):
+    """按所有标点切成自然换气组（分句），贪心打包：每块 15–40 字，句末标点是优先断点，
+    过短的块往后并（避免 11 个字 0.3 秒的碎块），过长的块在逗号处断。
     返回 [(chunk, pause_after)]，pause 按块尾标点定：句末 0.45 秒，句内 0.25 秒。
     原理：Mimo 原版同一段 392 字里有 15 处停顿（约每 26 字一停，0.15–0.58 秒），
     语速感来自停顿频率而不是单字快慢；句级切块（4–5 秒一口气）听着就是快放。"""
     parts = re.split(r"(?<=[。！？；，、：])", text)
-    raw = [p.strip() for p in parts if p.strip()]
-    pieces = []
-    for p in raw:
-        if len(p) <= max_len:
-            pieces.append(p)
-            continue
-        sub = re.split(r"(?<=[，、：])", p)
-        buf = ""
-        for s in sub:
-            if len(buf) + len(s) <= max_len:
-                buf += s
-            else:
-                if buf:
-                    pieces.append(buf)
-                buf = s
-                while len(buf) > max_len:
-                    pieces.append(buf[:max_len])
-                    buf = buf[max_len:]
-        if buf:
-            pieces.append(buf)
+    pieces = [p.strip() for p in parts if p.strip()]
     chunks = []
+    cur = ""
     for p in pieces:
-        if chunks and len(p) < min_len:
-            chunks[-1] += p
-        else:
-            chunks.append(p)
+        if not cur:
+            cur = p
+            continue
+        if len(cur) + len(p) > max_len:
+            chunks.append(cur)
+            cur = p
+            continue
+        if cur[-1] in SENT_END and len(cur) >= min_len:
+            chunks.append(cur)
+            cur = p
+            continue
+        cur += p
+    if cur:
+        chunks.append(cur)
     out = []
     for c in chunks:
         pause = 0.45 if c[-1] in SENT_END else 0.25
