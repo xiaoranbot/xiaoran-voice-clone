@@ -11,8 +11,8 @@ Mimo TTS 经常 500，配音断档的备胎：每天晚上在 Colab T4 上用 F5
 
 ```bash
 colab run --gpu T4 --keep -s xiaoran-trial-01 synthesize.py \
-  --ref-audio-url https://raw.githubusercontent.com/xiaoranbot/xiaoran-voice-clone/main/ref/ref_long.wav \
-  --ref-text-url  https://raw.githubusercontent.com/xiaoranbot/xiaoran-voice-clone/main/ref/ref_long.txt \
+  --ref-audio-url https://raw.githubusercontent.com/xiaoranbot/xiaoran-voice-clone/master/ref/ref_long.wav \
+  --ref-text-url  https://raw.githubusercontent.com/xiaoranbot/xiaoran-voice-clone/master/ref/ref_long.txt \
   --gen-text "官方说鱼可以留下来、只是要往后退一格，然然听着心里踏实多啦，尾巴轻轻摇着呢！" \
   --out /content/xiaoran_trial.wav
 colab download -s xiaoran-trial-01 /content/xiaoran_trial.wav ./xiaoran_trial.wav
