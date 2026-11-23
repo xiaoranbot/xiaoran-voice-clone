@@ -64,9 +64,37 @@ SENT_END = "。！？；"
 CLAUSE_END = "，、："
 
 
-def split_gen_chunks(text, max_len=30, min_len=8):
+def trim_silence(path, thresh=0.02):
+    """去掉 wav 首尾低于阈值的静音（F5-TTS 每块自带约 0.3–0.4 秒首尾静音，
+    不去的话会和插入的停顿叠加，停顿被拉长到 0.6–1.0 秒、听着一顿一顿）。
+    返回修剪后的时长（秒）。"""
+    import array
+    with wave.open(path, "rb") as w:
+        nch, sw, sr, n = (w.getnchannels(), w.getsampwidth(),
+                          w.getframerate(), w.getnframes())
+        frames = w.readframes(n)
+    a = array.array("h")
+    a.frombytes(frames)
+    limit = int(32768 * thresh)
+    start = 0
+    while start < len(a) and abs(a[start]) <= limit:
+        start += 1
+    end = len(a)
+    while end > start and abs(a[end - 1]) <= limit:
+        end -= 1
+    if start == 0 and end == len(a):
+        return len(a) / sr
+    with wave.open(path, "wb") as w:
+        w.setnchannels(nch)
+        w.setsampwidth(sw)
+        w.setframerate(sr)
+        w.writeframes(a[start:end].tobytes())
+    return (end - start) / sr
+
+
+def split_gen_chunks(text, max_len=30, min_len=15):
     """按所有标点切成自然换气组（分句）；过短的并入上一块；过长的硬切。
-    返回 [(chunk, pause_after)]，pause 按块尾标点定：句末 0.5 秒，句内 0.25 秒。
+    返回 [(chunk, pause_after)]，pause 按块尾标点定：句末 0.45 秒，句内 0.25 秒。
     原理：Mimo 原版同一段 392 字里有 15 处停顿（约每 26 字一停，0.15–0.58 秒），
     语速感来自停顿频率而不是单字快慢；句级切块（4–5 秒一口气）听着就是快放。"""
     parts = re.split(r"(?<=[。！？；，、：])", text)
@@ -98,7 +126,7 @@ def split_gen_chunks(text, max_len=30, min_len=8):
             chunks.append(p)
     out = []
     for c in chunks:
-        pause = 0.5 if c[-1] in SENT_END else 0.25
+        pause = 0.45 if c[-1] in SENT_END else 0.25
         out.append((c, pause))
     return out
 
@@ -217,6 +245,11 @@ def main():
         print("API 推理出错（%s），退 CLI" % e)
         outs = infer_cli_chunks(ref_audio, ref_text, texts, work_dir,
                                 args.model, speed=args.speed)
+
+    for o in outs:
+        d = trim_silence(o)
+        if d < 0.5:
+            print("警告：%s 修剪后仅 %.2f 秒，可能过短" % (o, d))
 
     concat_wavs(outs, args.out, pauses=pauses)
     with wave.open(args.out, "rb") as w:
