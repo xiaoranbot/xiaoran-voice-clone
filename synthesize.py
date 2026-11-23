@@ -23,10 +23,20 @@ import urllib.request
 import wave
 
 
-def download(url, path):
+def download(url, path, tries=3):
     print("下载 %s -> %s" % (url, path))
-    urllib.request.urlretrieve(url, path)
-    print("  %d 字节" % os.path.getsize(path))
+    last = None
+    for i in range(tries):
+        try:
+            urllib.request.urlretrieve(url, path)
+            print("  %d 字节" % os.path.getsize(path))
+            return
+        except Exception as e:
+            last = e
+            print("  第 %d 次失败（%s），等 %d 秒重试" % (i + 1, e, 5 * (i + 1)))
+            import time
+            time.sleep(5 * (i + 1))
+    raise last
 
 
 def read_text(path):
