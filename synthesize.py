@@ -3,7 +3,7 @@
 
 用法：
   python synthesize.py --ref-audio-url <wav 链接> --ref-text-url <txt 链接>
-      --gen-text "要说的话" | --gen-text-file /path/to/text.txt
+      --gen-text "要说的话" | --gen-text-file /path/to/text.txt | --gen-text-url <txt 链接>
       --out /content/out.wav [--model F5TTS_v1_Base] [--speed 1.0]
 
 要点：
@@ -141,6 +141,7 @@ def main():
     ap.add_argument("--ref-text-url", required=True)
     ap.add_argument("--gen-text", default="")
     ap.add_argument("--gen-text-file", default="")
+    ap.add_argument("--gen-text-url", default="")
     ap.add_argument("--out", required=True)
     ap.add_argument("--model", default="F5TTS_v1_Base")
     ap.add_argument("--speed", type=float, default=1.0,
@@ -159,7 +160,10 @@ def main():
         print("注意：参考音超过 12 秒，F5-TTS 会截断，只用前 12 秒，"
               "参考文本须与前 12 秒的实际内容对应，否则音色会歪")
 
-    if args.gen_text_file:
+    if args.gen_text_url:
+        download(args.gen_text_url, "/content/gen.txt")
+        gen_text = read_text("/content/gen.txt")
+    elif args.gen_text_file:
         gen_text = read_text(args.gen_text_file)
     else:
         gen_text = args.gen_text
