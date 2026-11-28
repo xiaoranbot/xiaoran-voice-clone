@@ -104,12 +104,20 @@ def main():
 
     out_dir = Path(args.out_dir) if args.out_dir else Path.home() / "workspace" / "dafeiyu" / "audio"
     out_dir.mkdir(parents=True, exist_ok=True)
+    progress_path = out_dir / "progress.txt"
+    import time as _time
+    def _progress(msg):
+        line = f"{_time.strftime('%H:%M:%S')} {msg}"
+        print(line, flush=True)
+        with open(progress_path, "a", encoding="utf-8") as f:
+            f.write(line + "\n")
+    _progress(f"全文 {len(full_text)} 字，切成 {len(chunks)} 块，开始生成")
     wav_path = out_dir / f"{args.date}-omnivoice.wav"
 
     gap = np.zeros(int(SAMPLE_RATE * GAP_SECONDS), dtype=np.float32)
     pieces = []
     for i, chunk in enumerate(chunks, 1):
-        print(f"[{i}/{len(chunks)}] 生成 {len(chunk)} 字……")
+        _progress(f"[{i}/{len(chunks)}] 生成 {len(chunk)} 字……")
         audio = model.generate(text=chunk, voice_clone_prompt=prompt)
         arr = np.asarray(audio[0], dtype=np.float32)
         pieces.append(arr)
@@ -117,7 +125,7 @@ def main():
             pieces.append(gap)
     merged = np.concatenate(pieces) if pieces else np.zeros(0, dtype=np.float32)
     sf.write(str(wav_path), merged, SAMPLE_RATE)
-    print(f"已写出：{wav_path}（{len(merged)/SAMPLE_RATE:.1f} 秒）")
+    _progress(f"已写出：{wav_path}（{len(merged)/SAMPLE_RATE:.1f} 秒）")
     # 顺手转一份 MP3 供博客使用
     mp3_path = wav_path.with_suffix(".mp3")
     try:
